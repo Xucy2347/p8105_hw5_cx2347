@@ -1,0 +1,131 @@
+---
+title: "p8105_hw5_cx2347"
+author: "Chuyuan XU"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup}
+library(tidyverse)
+library(stringr)
+library(broom)
+library(patchwork)
+```
+
+### Problem 1
+```{r Problem 1}
+bd_sim = function(n_obj){
+  birthdays = sample(1:365, n_obj, replace = TRUE)
+  length(unique(birthdays)) < n_obj
+}
+
+sim_results_df = 
+  expand_grid(
+    sample_size = c(2:50),
+    iter = 1:10000
+  ) |>
+  mutate(
+    results = map(sample_size, bd_sim)
+  ) |>
+  unnest(results) |>
+  group_by(sample_size) |>
+  summarize(
+    n = n(),
+    n_true = sum(results == TRUE),
+    percent = n_true/n
+  ) |>
+  mutate(
+    percent = paste0(as.character(round(percent*100, 4)), "%")
+  )
+
+sim_results_df |>
+  knitr::kable(
+    col.names = c("Sample Size", "number of Iteration", "number of at least a Repeat", "Probability"),
+    caption = "the probability that at least two people in the group will share a birthday by averaging across the 10000 simulation runs"
+  )
+```
+
+### Problem 2
+```{r Problem 2_function}
+set.seed(1234)
+
+sim_t.test = function(mu) {
+  
+  sim2_data = tibble(
+    x = rnorm(n = 30, mean = mu, sd = 5),
+  )
+  
+  t.test(sim2_data, mu = mu) |>
+    broom::tidy() |>
+    janitor::clean_names() |>
+    select(mu_hat = estimate, p_value)
+
+}
+
+sim_t.test_results = 
+  expand_grid(
+    mu = c(0s:6),
+    iter = 1:5000
+  ) |>
+  mutate(
+    results = map(mu, sim_t.test)
+  ) |>
+  unnest(results)
+```
+
+```{r Problem 2_plot 1}
+# power vs. true mu
+t.test_fig1 = sim_t.test_results |>
+  group_by(mu) |>
+  summarize(
+    power = sum(p_value < 0.05)/5000
+  ) |>
+  ggplot(aes(x = mu, y = power)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    x = 'True mu',
+    y = 'Power',
+    title = 'the power of the test vs. the true value of mu'
+  )
+
+t.test_fig1
+```
+With higher difference between the null mu value and the mu in the sample, the higher the power is.
+
+```{r Problem 2_Plot 2}
+# power vs. true mu
+t.test_fig2 = sim_t.test_results |>
+  group_by(mu) |>
+  summarize(
+    power = sum(p_value < 0.05)/5000,
+    avg_mu_hat = mean(mu_hat), # the average estimate of mu_hat in samples
+    avg_mu_hat_rej = mean(mu_hat[p_value < 0.05]) # the average estimate of mu_hat only in samples for which the null was rejected
+  ) |>
+  pivot_longer(
+    names_to = "mu_type",
+    values_to = "mu_value",
+    cols = c("avg_mu_hat", "avg_mu_hat_rej")
+  ) |>
+  mutate(
+    mu_type = case_match(
+      mu_type,
+      "avg_mu_hat" ~ "the Mu_hat Mean in Samples",
+      "avg_mu_hat_rej" ~ "the Mu_hat Mean in Samples \n(where the null is rejected)"
+    )
+  ) |>
+  ggplot(aes(x = mu, y = mu_value, color = mu_type)) +
+  geom_point(color = 'black') +
+  geom_line(alpha = 0.8) + 
+  labs(
+    x = 'True Mu',
+    y = 'Average Estimated Mean Mu',
+    color = "" ,
+    title = 'the Average Estimated Mean Mu vs. the True Value of mu'
+  ) +
+  theme_minimal()
+
+t.test_fig2
+```
+
+The Sample average of estimated mu acroess tests for which the null is rejected approximately equal to the true value 
