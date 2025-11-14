@@ -10,10 +10,14 @@ library(tidyverse)
 library(stringr)
 library(broom)
 library(patchwork)
+library(rvest)
+library(httr)
+
+set.seed(1234)
 ```
 
 ### Problem 1
-```{r Problem 1}
+```{r Problem 1, message=FALSE}
 bd_sim = function(n_obj){
   birthdays = sample(1:365, n_obj, replace = TRUE)
   length(unique(birthdays)) < n_obj
@@ -33,29 +37,34 @@ sim_results_df =
     n = n(),
     n_true = sum(results == TRUE),
     percent = n_true/n
-  ) |>
-  mutate(
-    percent = paste0(as.character(round(percent*100, 4)), "%")
   )
 
 sim_results_df |>
-  knitr::kable(
-    col.names = c("Sample Size", "number of Iteration", "number of at least a Repeat", "Probability"),
-    caption = "the probability that at least two people in the group will share a birthday by averaging across the 10000 simulation runs"
+  ggplot(aes(x = sample_size, y = percent)) + 
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  scale_y_continuous(
+    limits = c(0,1)
+  ) +
+  labs(
+    x = "Sample Size",
+    y = "Probability",
+    title = "the probability that at least two people in the group will share a birthday"
   )
 ```
 
+As the sample size increases, the probability that at least two people in the group will share a birthday will increase.
+
 ### Problem 2
 ```{r Problem 2_function}
-set.seed(1234)
-
-sim_t.test = function(mu) {
+sim_t.test = function(mu){
   
   sim2_data = tibble(
-    x = rnorm(n = 30, mean = mu, sd = 5),
+    x = rnorm(n = 30, mean = mu, sd = 5)
   )
   
-  t.test(sim2_data, mu = mu) |>
+  t.test(sim2_data, mu = 0) |>
     broom::tidy() |>
     janitor::clean_names() |>
     select(mu_hat = estimate, p_value)
@@ -64,7 +73,7 @@ sim_t.test = function(mu) {
 
 sim_t.test_results = 
   expand_grid(
-    mu = c(0s:6),
+    mu = c(1:6),
     iter = 1:5000
   ) |>
   mutate(
@@ -83,6 +92,9 @@ t.test_fig1 = sim_t.test_results |>
   ggplot(aes(x = mu, y = power)) +
   geom_point() +
   geom_line() +
+  continuous_x_scale(
+    break = c(1:6)
+  ) + 
   labs(
     x = 'True mu',
     y = 'Power',
@@ -91,7 +103,8 @@ t.test_fig1 = sim_t.test_results |>
 
 t.test_fig1
 ```
-With higher difference between the null mu value and the mu in the sample, the higher the power is.
+
+As the True Mu increases, the Power increases.
 
 ```{r Problem 2_Plot 2}
 # power vs. true mu
@@ -128,4 +141,20 @@ t.test_fig2 = sim_t.test_results |>
 t.test_fig2
 ```
 
-The Sample average of estimated mu acroess tests for which the null is rejected approximately equal to the true value 
+
+### Problem 3
+```{r p3_import}
+csv = "https://raw.githubusercontent.com/washingtonpost/data-homicides/refs/heads/master/homicide-data.csv"
+
+homocide_raw = read_csv(csv, na=c("NA", "", "."))
+```
+
+```{r data desc}
+# Describe the raw data.
+# Create a city_state variable (e.g. “Baltimore, MD”) and then summarize within cities to obtain the total number of homicides and the number of unsolved homicides (those for which the disposition is “Closed without arrest” or “Open/No arrest”).
+
+homocide_df = homocide_raw |>
+  mutate(city_state = str_c())
+  
+```
+
